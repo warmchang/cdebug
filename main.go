@@ -76,7 +76,7 @@ func main() {
 		}
 
 		// Hopefully, only usage errors.
-		logrus.Debug("Exit error: %s", err)
+		logrus.Debugf("Exit error: %s", err)
 		os.Exit(1)
 	}
 }
