@@ -6,10 +6,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/cmd/ctr/commands/content"
-	"github.com/containerd/containerd/errdefs"
+	ctdclient "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli/streams"
 )
 
@@ -23,7 +23,7 @@ var wellKnownAddresses = []string{
 }
 
 type Client struct {
-	*containerd.Client
+	*ctdclient.Client
 	out       *streams.Out
 	namespace string
 }
@@ -45,7 +45,7 @@ func NewClient(opts Options) (*Client, error) {
 		namespace = opts.Namespace
 	}
 
-	inner, err := containerd.New(addr, containerd.WithDefaultNamespace(namespace))
+	inner, err := ctdclient.New(addr, ctdclient.WithDefaultNamespace(namespace))
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (c *Client) Namespace() string {
 
 func (c *Client) ContainerRemoveEx(
 	ctx context.Context,
-	cont containerd.Container,
+	cont ctdclient.Container,
 	force bool,
 ) error {
 	task, err := cont.Task(ctx, cio.Load)
@@ -90,7 +90,7 @@ func (c *Client) ImagePullEx(
 	ctx context.Context,
 	ref string,
 	platform string,
-) (containerd.Image, error) {
+) (ctdclient.Image, error) {
 	if !strings.Contains(ref, ":") {
 		ref = ref + ":latest"
 	}
@@ -106,8 +106,8 @@ func (c *Client) ImagePullEx(
 	image, err := c.Pull(
 		ctx,
 		ref,
-		containerd.WithPullUnpack,
-		containerd.WithPlatform(platform),
+		ctdclient.WithPullUnpack,
+		ctdclient.WithPlatform(platform),
 	)
 	stopProgress()
 	if err != nil {
@@ -120,7 +120,7 @@ func (c *Client) ImagePullEx(
 
 func (c *Client) taskRemove(
 	ctx context.Context,
-	task containerd.Task,
+	task ctdclient.Task,
 	force bool,
 ) error {
 	status, err := task.Status(ctx)
@@ -128,7 +128,7 @@ func (c *Client) taskRemove(
 		return err
 	}
 
-	if status.Status == containerd.Created || status.Status == containerd.Stopped {
+	if status.Status == ctdclient.Created || status.Status == ctdclient.Stopped {
 		if _, err := task.Delete(ctx); err != nil && !errdefs.IsNotFound(err) {
 			return err
 		}
@@ -139,17 +139,17 @@ func (c *Client) taskRemove(
 		return errors.New("cannot remove active container - stop the container first or try force removal instead")
 	}
 
-	if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+	if _, err := task.Delete(ctx, ctdclient.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 		return err
 	}
 
 	return nil
 }
 
-func (c *Client) containerRemove(ctx context.Context, cont containerd.Container) error {
-	var opts []containerd.DeleteOpts
+func (c *Client) containerRemove(ctx context.Context, cont ctdclient.Container) error {
+	var opts []ctdclient.DeleteOpts
 	if _, err := cont.Image(ctx); err == nil {
-		opts = append(opts, containerd.WithSnapshotCleanup)
+		opts = append(opts, ctdclient.WithSnapshotCleanup)
 	}
 
 	return cont.Delete(ctx, opts...)

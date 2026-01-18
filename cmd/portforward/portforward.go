@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/sirupsen/logrus"
@@ -149,7 +149,7 @@ func runPortForward(ctx context.Context, cli cliutil.CLI, opts *options) error {
 	}
 
 	// Find existing forwarder image.
-	images, err := client.ImageList(ctx, types.ImageListOptions{
+	images, err := client.ImageList(ctx, image.ListOptions{
 		All: true,
 		Filters: filters.NewArgs(
 			filters.Arg("reference", forwarderImage),
@@ -157,7 +157,7 @@ func runPortForward(ctx context.Context, cli cliutil.CLI, opts *options) error {
 	})
 	if err != nil || len(images) == 0 {
 		cli.PrintAux("Pulling forwarder image...\n")
-		if err := client.ImagePullEx(ctx, forwarderImage, types.ImagePullOptions{
+		if err := client.ImagePullEx(ctx, forwarderImage, image.PullOptions{
 			// Platform: ... TODO: Test if an arm64 sidecar can be attached to an amd64 target and vice versa.
 		}); err != nil {
 			return fmt.Errorf("cannot pull forwarder image %q: %w", forwarderImage, err)
@@ -253,7 +253,7 @@ func getRunningTarget(
 	client dockerclient.CommonAPIClient,
 	target string,
 	runningTimeout time.Duration,
-) (types.ContainerJSON, error) {
+) (container.InspectResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, runningTimeout)
 	defer cancel()
 
@@ -274,7 +274,7 @@ func getRunningTarget(
 	}
 }
 
-func validateTarget(target types.ContainerJSON) error {
+func validateTarget(target container.InspectResponse) error {
 	hasIP := false
 	for _, net := range target.NetworkSettings.Networks {
 		hasIP = hasIP || len(net.IPAddress) > 0
@@ -307,7 +307,7 @@ type sidecarForwarding struct {
 }
 
 func parseLocalForwardings(
-	target types.ContainerJSON,
+	target container.InspectResponse,
 	locals []string,
 ) ([]forwarding, error) {
 	var parsed []forwarding
@@ -322,7 +322,7 @@ func parseLocalForwardings(
 }
 
 func parseLocalForwarding(
-	target types.ContainerJSON,
+	target container.InspectResponse,
 	local string,
 ) (forwarding, error) {
 	parts := strings.Split(local, ":")
@@ -412,7 +412,7 @@ func parseLocalForwarding(
 	}, nil
 }
 
-func unambiguousIP(target types.ContainerJSON) (string, error) {
+func unambiguousIP(target container.InspectResponse) (string, error) {
 	var found string
 	for _, net := range target.NetworkSettings.Networks {
 		if len(net.IPAddress) > 0 {
@@ -431,7 +431,7 @@ func unambiguousIP(target types.ContainerJSON) (string, error) {
 	return found, nil
 }
 
-func lookupTargetIP(target types.ContainerJSON, ipAliasNetwork string) (string, error) {
+func lookupTargetIP(target container.InspectResponse, ipAliasNetwork string) (string, error) {
 	for name, net := range target.NetworkSettings.Networks {
 		if len(net.IPAddress) == 0 {
 			continue
@@ -455,7 +455,7 @@ func lookupTargetIP(target types.ContainerJSON, ipAliasNetwork string) (string, 
 	return "", errors.New("cannot derive remote host")
 }
 
-func lookupPortBindings(target types.ContainerJSON, targetPort string) []nat.PortBinding {
+func lookupPortBindings(target container.InspectResponse, targetPort string) []nat.PortBinding {
 	for port, bindings := range target.NetworkSettings.Ports {
 		if targetPort == port.Port() {
 			return bindings
@@ -464,7 +464,7 @@ func lookupPortBindings(target types.ContainerJSON, targetPort string) []nat.Por
 	return nil
 }
 
-func targetNetworkByIP(target types.ContainerJSON, ip string) (string, error) {
+func targetNetworkByIP(target container.InspectResponse, ip string) (string, error) {
 	for name, net := range target.NetworkSettings.Networks {
 		if net.IPAddress == ip {
 			return name, nil
@@ -477,7 +477,7 @@ func startLocalForwarders(
 	ctx context.Context,
 	cli cliutil.CLI,
 	client dockerclient.CommonAPIClient,
-	target types.ContainerJSON,
+	target container.InspectResponse,
 	locals []forwarding,
 ) <-chan error {
 	doneCh := make(chan error, 1)
@@ -513,7 +513,7 @@ func runLocalForwarder(
 	ctx context.Context,
 	cli cliutil.CLI,
 	client dockerclient.CommonAPIClient,
-	target types.ContainerJSON,
+	target container.InspectResponse,
 	fwd forwarding,
 ) error {
 	if len(fwd.localHost) == 0 {

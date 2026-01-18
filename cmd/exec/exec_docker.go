@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/sirupsen/logrus"
 
@@ -45,7 +46,7 @@ func runDebuggerDocker(ctx context.Context, cli cliutil.CLI, opts *options) erro
 	}
 	if !imageExists {
 		cli.PrintAux("Pulling debugger image...\n")
-		if err := client.ImagePullEx(ctx, opts.image, types.ImagePullOptions{
+		if err := client.ImagePullEx(ctx, opts.image, image.PullOptions{
 			Platform: platform,
 		}); err != nil {
 			return errCannotPull(opts.image, err)

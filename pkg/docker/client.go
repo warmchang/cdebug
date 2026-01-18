@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/docker/cli/cli/streams"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 )
@@ -50,10 +50,10 @@ func NewClient(opts Options) (*Client, error) {
 
 func (c *Client) ImagePullEx(
 	ctx context.Context,
-	image string,
-	options types.ImagePullOptions,
+	img string,
+	options image.PullOptions,
 ) error {
-	resp, err := c.CommonAPIClient.ImagePull(ctx, image, options)
+	resp, err := c.CommonAPIClient.ImagePull(ctx, img, options)
 	if err != nil {
 		return err
 	}
